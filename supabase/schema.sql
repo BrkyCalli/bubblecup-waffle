@@ -170,3 +170,80 @@ grant select, insert on public.orders to anon, authenticated;
 grant update on public.orders to authenticated;
 grant select, insert on public.order_items to anon, authenticated;
 grant select, update on public.profiles to authenticated;
+
+-- ----------------------------------------------------------------
+-- 8) SİPARİŞ OLUŞTURMA fonksiyonu (sepet → orders + order_items)
+-- ----------------------------------------------------------------
+-- security definer: RLS'i güvenle aşar (misafir siparişlerinin alt
+-- kalemlerini ekleyebilmek için gerekli). Fiyatları client'tan DEĞİL,
+-- products tablosundan okur. Hepsi tek işlemde (atomik) yazılır.
+-- p_items biçimi: [{ "product_id": "...", "quantity": 2, "customizations": [...] }, ...]
+create or replace function public.create_order(
+  p_items jsonb,
+  p_note  text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order_id uuid;
+  v_total    numeric := 0;
+  v_item     jsonb;
+  v_pid      text;
+  v_qty      int;
+  v_price    numeric;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'Sepet boş';
+  end if;
+
+  -- Sipariş başlığı (total'i kalemlerden sonra güncelliyoruz)
+  insert into public.orders (user_id, status, total, notes, whatsapp_sent)
+  values (
+    auth.uid(),                                  -- üye ise id, misafir ise null
+    'pending',
+    0,
+    nullif(trim(coalesce(p_note, '')), ''),
+    true
+  )
+  returning id into v_order_id;
+
+  -- Kalemler: fiyat products tablosundan (güvenilir kaynak) alınır
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_pid := v_item ->> 'product_id';
+    v_qty := coalesce((v_item ->> 'quantity')::int, 0);
+
+    if v_qty < 1 then
+      raise exception 'Geçersiz adet: %', v_qty;
+    end if;
+
+    select price into v_price
+      from public.products
+      where id = v_pid and is_active = true;
+
+    if v_price is null then
+      raise exception 'Geçersiz ürün: %', v_pid;
+    end if;
+
+    insert into public.order_items (order_id, product_id, quantity, unit_price, customizations)
+    values (
+      v_order_id,
+      v_pid,
+      v_qty,
+      v_price,
+      coalesce(v_item -> 'customizations', '[]'::jsonb)
+    );
+
+    v_total := v_total + v_price * v_qty;
+  end loop;
+
+  update public.orders set total = v_total where id = v_order_id;
+
+  return v_order_id;
+end;
+$$;
+
+grant execute on function public.create_order(jsonb, text) to anon, authenticated;

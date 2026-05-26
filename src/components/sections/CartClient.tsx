@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { buildOrderUrl, formatPrice } from "@/lib/whatsapp";
+import { createOrder, type OrderItemInput } from "@/lib/order-actions";
 import type { PersonSelection } from "@/types";
 import { ProductImage } from "./ProductImage";
 import { WhatsAppIcon } from "@/components/layout/WhatsAppIcon";
@@ -44,15 +45,97 @@ export function CartClient() {
   const { items, total, updateQuantity, removeItem, clearCart } = useCart();
   const [note, setNote] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+  const [placedUrl, setPlacedUrl] = useState("");
 
   // localStorage'dan sepet okunana kadar bekle (boş ekranın yanıp sönmesini önler)
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  async function handleOrder() {
+    setError(null);
+    setPlacing(true);
+
+    // Popup engelleyiciyi aşmak için boş sekmeyi tık anında aç,
+    // siparişi kaydettikten sonra adresini WhatsApp'a çevir.
+    const waWindow = window.open("", "_blank");
+    const url = buildOrderUrl(items, total, note);
+
+    const payload: OrderItemInput[] = items.map((item) => ({
+      productId: item.product.id,
+      quantity: item.quantity,
+      selections: item.selections ?? [],
+    }));
+
+    const result = await createOrder(payload, note);
+
+    if (!result.ok) {
+      waWindow?.close();
+      setError(result.error);
+      setPlacing(false);
+      return;
+    }
+
+    if (waWindow) {
+      waWindow.location.href = url;
+    } else {
+      // Sekme açılamadıysa (popup engeli) aynı sekmede aç
+      window.location.href = url;
+    }
+
+    setPlacedUrl(url);
+    setPlacedOrderId(result.orderId);
+    clearCart();
+    setPlacing(false);
+  }
+
   if (!mounted) {
     return (
       <p className="py-20 text-center text-metin-orta">Sepet yükleniyor…</p>
+    );
+  }
+
+  // Sipariş kaydedildi → onay ekranı (sepet temizlendiği için bundan önce gelir)
+  if (placedOrderId) {
+    const shortId = placedOrderId.slice(0, 8).toUpperCase();
+    return (
+      <div className="flex flex-col items-center rounded-2xl border border-pembe/15 bg-white py-16 text-center shadow-sm">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl">
+          🎉
+        </div>
+        <h2 className="mt-5 font-display text-2xl font-semibold text-metin">
+          Siparişiniz alındı!
+        </h2>
+        <p className="mt-3 max-w-md px-6 text-metin-orta">
+          Sipariş numaranız{" "}
+          <span className="font-semibold text-metin">#{shortId}</span>. Açılan
+          WhatsApp penceresinden mesajı göndererek siparişinizi{" "}
+          <strong className="text-metin">onaylamayı unutmayın</strong>.
+        </p>
+        <p className="mt-2 text-sm text-metin-orta">
+          WhatsApp açılmadıysa aşağıdaki butona tıklayın.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <a
+            href={placedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-[#1fb855]"
+          >
+            <WhatsAppIcon className="h-5 w-5" />
+            WhatsApp&apos;ı Aç
+          </a>
+          <Link
+            href="/menu"
+            className="flex items-center justify-center rounded-full border border-pembe/30 px-6 py-3 text-base font-semibold text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+          >
+            Menüye Dön
+          </Link>
+        </div>
+      </div>
     );
   }
 
@@ -77,8 +160,6 @@ export function CartClient() {
       </div>
     );
   }
-
-  const orderUrl = buildOrderUrl(items, total, note);
 
   return (
     <div className="grid gap-8 lg:grid-cols-3">
@@ -224,15 +305,21 @@ export function CartClient() {
             🕐 Tahmini hazırlanma ve teslimat süresi: ~30 dakika
           </p>
 
-          <a
-            href={orderUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#1fb855]"
+          {error && (
+            <p className="mt-4 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={handleOrder}
+            disabled={placing}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#1fb855] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <WhatsAppIcon className="h-5 w-5" />
-            WhatsApp ile Sipariş Ver
-          </a>
+            {placing ? "Sipariş kaydediliyor…" : "WhatsApp ile Sipariş Ver"}
+          </button>
 
           <button
             type="button"

@@ -81,9 +81,12 @@ export function Header() {
                     Admin
                   </Link>
                 )}
-                <span className="max-w-[10rem] truncate px-2 text-sm font-medium text-metin">
+                <Link
+                  href="/hesabim"
+                  className="max-w-[10rem] truncate rounded-full px-3 py-2 text-sm font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                >
                   {displayName}
-                </span>
+                </Link>
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -158,6 +161,13 @@ export function Header() {
                       <span className="block px-3 py-2 text-sm text-metin-orta">
                         {displayName}
                       </span>
+                      <Link
+                        href="/hesabim"
+                        onClick={() => setOpen(false)}
+                        className="block rounded-lg px-3 py-3 text-base font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                      >
+                        Hesabım
+                      </Link>
                       {isAdmin(user) && (
                         <Link
                           href="/admin"

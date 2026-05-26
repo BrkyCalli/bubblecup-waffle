@@ -5,6 +5,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+// Çıkış: oturum cookie'lerini SUNUCUDA temizler (tarayıcı JS'ine bağımlı değil).
+export async function signOut(): Promise<void> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
 // Form sonucu: hata varsa error, kayıt başarılıysa success mesajı taşır.
 export type AuthState = {
   error?: string;

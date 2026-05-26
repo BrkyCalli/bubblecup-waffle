@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut, Menu, ShoppingBag, User as UserIcon } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { useAuth } from "@/lib/use-auth";
-import { isAdmin } from "@/lib/admin";
-import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/lib/auth-actions";
 import {
   Sheet,
   SheetContent,
@@ -22,24 +19,18 @@ const navLinks = [
   { href: "/iletisim", label: "İletişim" },
 ];
 
-export function Header() {
+// Oturum bilgisi sunucudan (layout) gelir — tarayıcıda cookie okumaya bağımlı değiliz.
+export type HeaderUser = {
+  email: string | null;
+  fullName: string | null;
+  isAdmin: boolean;
+};
+
+export function Header({ user }: { user: HeaderUser | null }) {
   const { itemCount } = useCart();
-  const { user } = useAuth();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // user_metadata.full_name varsa onu, yoksa e-postayı göster.
-  const displayName =
-    (user?.user_metadata?.full_name as string | undefined) ||
-    user?.email ||
-    "Hesabım";
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setOpen(false);
-    router.refresh();
-  }
+  const displayName = user?.fullName || user?.email || "Hesabım";
 
   return (
     <header className="sticky top-0 z-40 border-b border-pembe/15 bg-krem/90 backdrop-blur-md">
@@ -73,7 +64,7 @@ export function Header() {
           <div className="hidden items-center md:flex">
             {user ? (
               <div className="flex items-center gap-1">
-                {isAdmin(user) && (
+                {user.isAdmin && (
                   <Link
                     href="/admin"
                     className="rounded-full px-3 py-2 text-sm font-semibold text-altin-koyu transition-colors hover:bg-altin/10"
@@ -87,14 +78,15 @@ export function Header() {
                 >
                   {displayName}
                 </Link>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  aria-label="Çıkış yap"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
-                >
-                  <LogOut className="h-5 w-5" />
-                </button>
+                <form action={signOut} className="flex">
+                  <button
+                    type="submit"
+                    aria-label="Çıkış yap"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </button>
+                </form>
               </div>
             ) : (
               <Link
@@ -168,7 +160,7 @@ export function Header() {
                       >
                         Hesabım
                       </Link>
-                      {isAdmin(user) && (
+                      {user.isAdmin && (
                         <Link
                           href="/admin"
                           onClick={() => setOpen(false)}
@@ -177,14 +169,15 @@ export function Header() {
                           Admin Paneli
                         </Link>
                       )}
-                      <button
-                        type="button"
-                        onClick={handleSignOut}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-base font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
-                      >
-                        <LogOut className="h-5 w-5" />
-                        Çıkış Yap
-                      </button>
+                      <form action={signOut}>
+                        <button
+                          type="submit"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-base font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                        >
+                          <LogOut className="h-5 w-5" />
+                          Çıkış Yap
+                        </button>
+                      </form>
                     </>
                   ) : (
                     <>

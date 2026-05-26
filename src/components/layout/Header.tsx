@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LogOut, Menu, ShoppingBag, User as UserIcon } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useAuth } from "@/lib/use-auth";
+import { createClient } from "@/lib/supabase/client";
 import {
   Sheet,
   SheetContent,
@@ -20,7 +23,22 @@ const navLinks = [
 
 export function Header() {
   const { itemCount } = useCart();
+  const { user } = useAuth();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // user_metadata.full_name varsa onu, yoksa e-postayı göster.
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email ||
+    "Hesabım";
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setOpen(false);
+    router.refresh();
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-pembe/15 bg-krem/90 backdrop-blur-md">
@@ -50,6 +68,33 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Masaüstü: giriş / kullanıcı */}
+          <div className="hidden items-center md:flex">
+            {user ? (
+              <div className="flex items-center gap-1">
+                <span className="max-w-[10rem] truncate px-2 text-sm font-medium text-metin">
+                  {displayName}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  aria-label="Çıkış yap"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/giris"
+                className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+              >
+                <UserIcon className="h-4 w-4" />
+                Giriş
+              </Link>
+            )}
+          </div>
+
           {/* Sepet ikonu */}
           <Link
             href="/sepet"
@@ -96,6 +141,43 @@ export function Header() {
                 >
                   Sepetim {itemCount > 0 && `(${itemCount})`}
                 </Link>
+
+                {/* Giriş / kullanıcı (mobil) */}
+                <div className="mt-2 border-t border-pembe/15 pt-2">
+                  {user ? (
+                    <>
+                      <span className="block px-3 py-2 text-sm text-metin-orta">
+                        {displayName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-base font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                      >
+                        <LogOut className="h-5 w-5" />
+                        Çıkış Yap
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/giris"
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-3 text-base font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                      >
+                        <UserIcon className="h-5 w-5" />
+                        Giriş Yap
+                      </Link>
+                      <Link
+                        href="/kayit"
+                        onClick={() => setOpen(false)}
+                        className="rounded-lg px-3 py-3 text-base font-medium text-metin transition-colors hover:bg-pembe/10 hover:text-pembe-koyu"
+                      >
+                        Kayıt Ol
+                      </Link>
+                    </>
+                  )}
+                </div>
               </nav>
             </SheetContent>
           </Sheet>

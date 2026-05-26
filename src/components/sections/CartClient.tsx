@@ -91,6 +91,7 @@ export function CartClient() {
               className="flex gap-4 rounded-2xl border border-pembe/15 bg-white p-4 shadow-sm"
             >
               <ProductImage
+                src={item.product.image}
                 alt={item.product.name}
                 className="h-24 w-24 shrink-0 rounded-xl"
               />

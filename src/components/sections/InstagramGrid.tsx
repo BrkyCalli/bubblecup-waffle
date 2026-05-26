@@ -1,4 +1,5 @@
 import { InstagramIcon } from "@/components/layout/InstagramIcon";
+import { ImageWithFallback } from "./ImageWithFallback";
 
 const INSTAGRAM_URL = "https://instagram.com/bubblecupwaffle09";
 
@@ -14,8 +15,7 @@ export function InstagramGrid() {
         </p>
       </div>
 
-      {/* Görseller eklenince public/images/instagram/ig-1.jpg ... ig-6.jpg
-          her kareye <Image> olarak yerleştirilecek */}
+      {/* Her kare: ig-1.png ... ig-6.png varsa gösterilir, yoksa yer tutucu kalır */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <a
@@ -23,12 +23,21 @@ export function InstagramGrid() {
             href={INSTAGRAM_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pembe/25 via-krem to-altin/25"
+            className="group relative block aspect-square overflow-hidden rounded-2xl"
           >
-            <span className="text-4xl opacity-70" aria-hidden="true">
-              🧇
-            </span>
-            <div className="absolute inset-0 flex items-center justify-center bg-pembe-koyu/0 opacity-0 transition-all duration-200 group-hover:bg-pembe-koyu/70 group-hover:opacity-100">
+            <ImageWithFallback
+              src={`/images/instagram/ig-${i + 1}.png`}
+              alt={`BUBBLECUP WAFFLE Instagram paylaşımı ${i + 1}`}
+              className="absolute inset-0"
+              sizes="(max-width: 640px) 50vw, 33vw"
+            >
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-pembe/25 via-krem to-altin/25">
+                <span className="text-4xl opacity-70" aria-hidden="true">
+                  🧇
+                </span>
+              </div>
+            </ImageWithFallback>
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-pembe-koyu/0 opacity-0 transition-all duration-200 group-hover:bg-pembe-koyu/70 group-hover:opacity-100">
               <InstagramIcon className="h-8 w-8 text-white" />
             </div>
           </a>

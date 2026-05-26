@@ -20,6 +20,7 @@ export function ProductCard({ product }: { product: Product }) {
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-pembe/15 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="relative">
         <ProductImage
+          src={product.image}
           alt={product.name}
           className="aspect-[4/3] w-full transition-transform duration-300 group-hover:scale-[1.03]"
         />

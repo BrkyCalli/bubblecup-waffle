@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import { WhatsAppIcon } from "@/components/layout/WhatsAppIcon";
+import { ImageWithFallback } from "./ImageWithFallback";
 
 export function Hero() {
   return (
     <section className="relative flex min-h-[88vh] items-center justify-center overflow-hidden">
-      {/* Arka plan: görsel eklenince bu gradyan katmanı <Image fill> ile değişecek
-          (public/images/hero.jpg) */}
-      <div className="absolute inset-0 bg-gradient-to-br from-pembe-koyu via-pembe to-altin" />
+      {/* Arka plan: hero.png varsa gösterilir, yoksa gradyan yer tutucu kalır */}
+      <ImageWithFallback
+        src="/images/hero.png"
+        alt="BUBBLECUP WAFFLE"
+        className="absolute inset-0"
+        sizes="100vw"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-pembe-koyu via-pembe to-altin" />
+      </ImageWithFallback>
       {/* Metin okunurluğu için koyu overlay */}
       <div className="absolute inset-0 bg-black/35" />
 

@@ -8,7 +8,7 @@ export const products: Product[] = [
     category: "klasik",
     description:
       "Tek kişilik, pratik ve doyurucu. Sıcacık waffle parçaları, bol soslar ve sevdiğin malzemelerle bardakta servis.",
-    image: "/images/products/bardak-waffle.jpg",
+    image: "/images/products/bardak-waffle.png",
     personCount: 1,
   },
   {
@@ -18,7 +18,7 @@ export const products: Product[] = [
     category: "ozel",
     description:
       "İki kişilik keyif, avantajlı fiyatla. İkiliyseniz bu paket tam size göre.",
-    image: "/images/products/2li-bardak-avantaj.jpg",
+    image: "/images/products/2li-bardak-avantaj.png",
     badge: "Avantaj",
     personCount: 2,
   },
@@ -29,7 +29,7 @@ export const products: Product[] = [
     category: "klasik",
     description:
       "Bol malzemeli, paylaşmalık kova waffle. Çıtır waffle parçaları ve birbirinden lezzetli soslarla dolu.",
-    image: "/images/products/kova-waffle.jpg",
+    image: "/images/products/kova-waffle.png",
     personCount: 1,
   },
   {
@@ -39,7 +39,7 @@ export const products: Product[] = [
     category: "klasik",
     description:
       "İki kova waffle, avantajlı fiyatla. Kalabalık keyifler ve uzun sohbetler için ideal.",
-    image: "/images/products/2li-kova-avantajli.jpg",
+    image: "/images/products/2li-kova-avantajli.png",
     badge: "Avantaj",
     personCount: 2,
   },
@@ -50,7 +50,7 @@ export const products: Product[] = [
     category: "ozel",
     description:
       "Üç kişilik dev kova paketi. Sevdiklerinle paylaşmak için bol bol waffle, sos ve meyve.",
-    image: "/images/products/paylasmali-kova.jpg",
+    image: "/images/products/paylasmali-kova.png",
     badge: "3 Kişilik",
     personCount: 3,
   },
@@ -61,7 +61,7 @@ export const products: Product[] = [
     category: "sinirsiz",
     description:
       "5 waffle al, 4'ünü öde! Sınırsız seçim hakkıyla en avantajlı paket. Kalabalık gruplar için kaçırılmaz fırsat.",
-    image: "/images/products/5al4ode.jpg",
+    image: "/images/products/5al4ode.png",
     badge: "Fırsat",
     personCount: 5,
   },

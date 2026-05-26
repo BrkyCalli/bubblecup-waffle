@@ -1,16 +1,24 @@
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import { WhatsAppIcon } from "@/components/layout/WhatsAppIcon";
+import { ImageWithFallback } from "./ImageWithFallback";
 
 export function Story() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
       <div className="grid items-center gap-10 md:grid-cols-2">
-        {/* Görsel: story.jpg eklenince bu gradyan <Image> ile değişecek */}
-        <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-3xl bg-gradient-to-br from-altin/30 via-krem to-pembe/30 shadow-sm">
-          <span className="text-7xl" aria-hidden="true">
-            🧇
-          </span>
-        </div>
+        {/* Görsel: story.png varsa gösterilir, yoksa gradyan yer tutucu kalır */}
+        <ImageWithFallback
+          src="/images/story.png"
+          alt="BUBBLECUP WAFFLE hikayemiz"
+          className="aspect-[4/3] rounded-3xl shadow-sm"
+          sizes="(max-width: 768px) 100vw, 50vw"
+        >
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-altin/30 via-krem to-pembe/30">
+            <span className="text-7xl" aria-hidden="true">
+              🧇
+            </span>
+          </div>
+        </ImageWithFallback>
 
         <div>
           <span className="text-sm font-semibold tracking-wide text-pembe-koyu uppercase">

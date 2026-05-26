@@ -1,4 +1,5 @@
-import type { CartItem } from "@/types";
+import type { CartItem, CustomerInfo } from "@/types";
+import { formatTurkishPhone } from "@/lib/validation";
 
 // Uluslararası formatta, başında + olmadan (wa.me bunu ister)
 export const WHATSAPP_NUMBER = "905424000524";
@@ -12,6 +13,7 @@ export function buildOrderMessage(
   items: CartItem[],
   total: number,
   note?: string,
+  customer?: CustomerInfo,
 ): string {
   const lines: string[] = ["Merhaba! Sipariş vermek istiyorum 🧇", ""];
 
@@ -32,6 +34,20 @@ export function buildOrderMessage(
     lines.push("");
   });
 
+  // Müşteri / teslimat bilgileri
+  if (customer) {
+    let address = customer.address.trim();
+    if (customer.unit.trim()) {
+      address += ` (Daire/Kapı: ${customer.unit.trim()})`;
+    }
+    lines.push(
+      `👤 Ad: ${customer.name.trim()}`,
+      `📞 Telefon: ${formatTurkishPhone(customer.phone)}`,
+      `📍 Adres: ${address}`,
+      "",
+    );
+  }
+
   const trimmedNote = note?.trim();
   if (trimmedNote) {
     lines.push(`📝 Not: ${trimmedNote}`);
@@ -50,8 +66,9 @@ export function buildOrderUrl(
   items: CartItem[],
   total: number,
   note?: string,
+  customer?: CustomerInfo,
 ): string {
-  const message = buildOrderMessage(items, total, note);
+  const message = buildOrderMessage(items, total, note, customer);
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 

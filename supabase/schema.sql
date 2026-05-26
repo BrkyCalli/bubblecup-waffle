@@ -64,17 +64,27 @@ on conflict (id) do nothing;
 -- 3) ORDERS  (siparişler)
 -- ----------------------------------------------------------------
 create table if not exists public.orders (
-  id            uuid primary key default gen_random_uuid(),
-  user_id       uuid references auth.users(id) on delete set null,  -- misafir sipariş için null
-  status        text not null default 'pending'
-                check (status in ('pending','confirmed','preparing','ready','delivered','cancelled')),
-  total         numeric not null default 0,
-  notes         text,
-  whatsapp_sent boolean not null default false,
-  created_at    timestamptz not null default now()
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid references auth.users(id) on delete set null,  -- misafir sipariş için null
+  status           text not null default 'pending'
+                   check (status in ('pending','confirmed','preparing','ready','delivered','cancelled')),
+  total            numeric not null default 0,
+  notes            text,
+  whatsapp_sent    boolean not null default false,
+  customer_name    text,    -- sipariş anında girilen ad soyad
+  customer_phone   text,    -- sipariş anında girilen telefon
+  delivery_address text,    -- teslimat adresi
+  delivery_unit    text,    -- daire/kapı no (opsiyonel)
+  created_at       timestamptz not null default now()
 );
 create index if not exists orders_user_id_idx on public.orders(user_id);
 create index if not exists orders_created_at_idx on public.orders(created_at desc);
+
+-- Mevcut kurulumlar için (orders tablosu çoktan oluştuysa) eksik sütunları ekle:
+alter table public.orders add column if not exists customer_name    text;
+alter table public.orders add column if not exists customer_phone   text;
+alter table public.orders add column if not exists delivery_address text;
+alter table public.orders add column if not exists delivery_unit    text;
 
 -- ----------------------------------------------------------------
 -- 4) ORDER_ITEMS  (sipariş satırları + kişi bazlı özelleştirme)
@@ -178,9 +188,15 @@ grant select, update on public.profiles to authenticated;
 -- kalemlerini ekleyebilmek için gerekli). Fiyatları client'tan DEĞİL,
 -- products tablosundan okur. Hepsi tek işlemde (atomik) yazılır.
 -- p_items biçimi: [{ "product_id": "...", "quantity": 2, "customizations": [...] }, ...]
+-- NOT: imza değiştiği için eski 2 parametreli sürümü düşürüyoruz.
+drop function if exists public.create_order(jsonb, text);
 create or replace function public.create_order(
-  p_items jsonb,
-  p_note  text default null
+  p_items            jsonb,
+  p_note             text default null,
+  p_customer_name    text default null,
+  p_customer_phone   text default null,
+  p_delivery_address text default null,
+  p_delivery_unit    text default null
 )
 returns uuid
 language plpgsql
@@ -199,14 +215,32 @@ begin
     raise exception 'Sepet boş';
   end if;
 
+  -- Zorunlu müşteri bilgileri (sunucu tarafı güvence)
+  if nullif(trim(coalesce(p_customer_name, '')), '') is null then
+    raise exception 'Ad Soyad zorunlu';
+  end if;
+  if nullif(trim(coalesce(p_customer_phone, '')), '') is null then
+    raise exception 'Telefon zorunlu';
+  end if;
+  if nullif(trim(coalesce(p_delivery_address, '')), '') is null then
+    raise exception 'Teslimat adresi zorunlu';
+  end if;
+
   -- Sipariş başlığı (total'i kalemlerden sonra güncelliyoruz)
-  insert into public.orders (user_id, status, total, notes, whatsapp_sent)
+  insert into public.orders (
+    user_id, status, total, notes, whatsapp_sent,
+    customer_name, customer_phone, delivery_address, delivery_unit
+  )
   values (
     auth.uid(),                                  -- üye ise id, misafir ise null
     'pending',
     0,
     nullif(trim(coalesce(p_note, '')), ''),
-    true
+    true,
+    trim(p_customer_name),
+    trim(p_customer_phone),
+    trim(p_delivery_address),
+    nullif(trim(coalesce(p_delivery_unit, '')), '')
   )
   returning id into v_order_id;
 
@@ -246,4 +280,4 @@ begin
 end;
 $$;
 
-grant execute on function public.create_order(jsonb, text) to anon, authenticated;
+grant execute on function public.create_order(jsonb, text, text, text, text, text) to anon, authenticated;

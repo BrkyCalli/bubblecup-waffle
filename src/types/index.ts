@@ -27,6 +27,14 @@ export interface CartItem {
   selections?: PersonSelection[];
 }
 
+// Sipariş sırasında alınan müşteri / teslimat bilgileri
+export interface CustomerInfo {
+  name: string; // Ad Soyad (zorunlu)
+  phone: string; // Telefon (zorunlu, TR formatı)
+  address: string; // Teslimat adresi (zorunlu)
+  unit: string; // Daire/Kapı No (opsiyonel)
+}
+
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   klasik: "Klasik",
   ozel: "Avantaj/Özel",

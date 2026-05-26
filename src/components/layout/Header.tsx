@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, Menu, ShoppingBag, User as UserIcon } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/use-auth";
+import { isAdmin } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/client";
 import {
   Sheet,
@@ -72,6 +73,14 @@ export function Header() {
           <div className="hidden items-center md:flex">
             {user ? (
               <div className="flex items-center gap-1">
+                {isAdmin(user) && (
+                  <Link
+                    href="/admin"
+                    className="rounded-full px-3 py-2 text-sm font-semibold text-altin-koyu transition-colors hover:bg-altin/10"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <span className="max-w-[10rem] truncate px-2 text-sm font-medium text-metin">
                   {displayName}
                 </span>
@@ -149,6 +158,15 @@ export function Header() {
                       <span className="block px-3 py-2 text-sm text-metin-orta">
                         {displayName}
                       </span>
+                      {isAdmin(user) && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setOpen(false)}
+                          className="block rounded-lg px-3 py-3 text-base font-semibold text-altin-koyu transition-colors hover:bg-altin/10"
+                        >
+                          Admin Paneli
+                        </Link>
+                      )}
                       <button
                         type="button"
                         onClick={handleSignOut}

@@ -6,7 +6,9 @@ import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { buildOrderUrl, formatPrice } from "@/lib/whatsapp";
 import { createOrder, type OrderItemInput } from "@/lib/order-actions";
-import type { PersonSelection } from "@/types";
+import { isValidTurkishPhone } from "@/lib/validation";
+import { Input } from "@/components/ui/input";
+import type { PersonSelection, CustomerInfo } from "@/types";
 import { ProductImage } from "./ProductImage";
 import { WhatsAppIcon } from "@/components/layout/WhatsAppIcon";
 
@@ -41,7 +43,13 @@ function SelectionSummary({
   );
 }
 
-export function CartClient() {
+export function CartClient({
+  initialName,
+  initialPhone,
+}: {
+  initialName: string;
+  initialPhone: string;
+}) {
   const { items, total, updateQuantity, removeItem, clearCart } = useCart();
   const [note, setNote] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -50,6 +58,13 @@ export function CartClient() {
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const [placedUrl, setPlacedUrl] = useState("");
 
+  // Müşteri / teslimat bilgileri (üye ise ad + telefon profilden ön-dolu)
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone);
+  const [address, setAddress] = useState("");
+  const [unit, setUnit] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
   // localStorage'dan sepet okunana kadar bekle (boş ekranın yanıp sönmesini önler)
   useEffect(() => {
     setMounted(true);
@@ -57,12 +72,35 @@ export function CartClient() {
 
   async function handleOrder() {
     setError(null);
+    setFormError(null);
+
+    // Müşteri bilgilerini doğrula (WhatsApp sekmesini açmadan önce)
+    if (!name.trim()) {
+      setFormError("Lütfen ad soyad girin.");
+      return;
+    }
+    if (!isValidTurkishPhone(phone)) {
+      setFormError("Geçerli bir telefon numarası girin (05XX XXX XX XX).");
+      return;
+    }
+    if (!address.trim()) {
+      setFormError("Lütfen teslimat adresini girin.");
+      return;
+    }
+
     setPlacing(true);
+
+    const customer: CustomerInfo = {
+      name: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      unit: unit.trim(),
+    };
 
     // Popup engelleyiciyi aşmak için boş sekmeyi tık anında aç,
     // siparişi kaydettikten sonra adresini WhatsApp'a çevir.
     const waWindow = window.open("", "_blank");
-    const url = buildOrderUrl(items, total, note);
+    const url = buildOrderUrl(items, total, note, customer);
 
     const payload: OrderItemInput[] = items.map((item) => ({
       productId: item.product.id,
@@ -70,7 +108,7 @@ export function CartClient() {
       selections: item.selections ?? [],
     }));
 
-    const result = await createOrder(payload, note);
+    const result = await createOrder(payload, note, customer);
 
     if (!result.ok) {
       waWindow?.close();
@@ -270,9 +308,84 @@ export function CartClient() {
         </button>
       </div>
 
-      {/* Sağ: özet */}
-      <div className="lg:col-span-1">
-        <div className="sticky top-20 rounded-2xl border border-pembe/15 bg-white p-6 shadow-sm">
+      {/* Sağ: teslimat bilgileri + özet */}
+      <div className="space-y-6 lg:col-span-1">
+        {/* Teslimat bilgileri formu */}
+        <div className="rounded-2xl border border-pembe/15 bg-white p-6 shadow-sm">
+          <h2 className="font-display text-xl font-semibold text-metin">
+            Teslimat Bilgileri
+          </h2>
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="ad-soyad"
+                className="text-sm font-medium text-metin"
+              >
+                Ad Soyad <span className="text-pembe-koyu">*</span>
+              </label>
+              <Input
+                id="ad-soyad"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                placeholder="Adınız Soyadınız"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="telefon"
+                className="text-sm font-medium text-metin"
+              >
+                Telefon <span className="text-pembe-koyu">*</span>
+              </label>
+              <Input
+                id="telefon"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
+                placeholder="05XX XXX XX XX"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="adres" className="text-sm font-medium text-metin">
+                Teslimat Adresi <span className="text-pembe-koyu">*</span>
+              </label>
+              <textarea
+                id="adres"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows={3}
+                placeholder="Mahalle, sokak/cadde, no…"
+                className="w-full resize-none rounded-lg border border-input bg-white p-3 text-sm text-metin outline-none focus:border-pembe focus:ring-2 focus:ring-pembe/20"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="daire" className="text-sm font-medium text-metin">
+                Daire / Kapı No{" "}
+                <span className="font-normal text-metin-orta">(opsiyonel)</span>
+              </label>
+              <Input
+                id="daire"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="Örn. D:3"
+              />
+            </div>
+          </div>
+
+          {formError && (
+            <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {formError}
+            </p>
+          )}
+        </div>
+
+        {/* Sipariş özeti */}
+        <div className="rounded-2xl border border-pembe/15 bg-white p-6 shadow-sm">
           <h2 className="font-display text-xl font-semibold text-metin">
             Sipariş Özeti
           </h2>

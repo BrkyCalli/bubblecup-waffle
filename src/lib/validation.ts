@@ -29,3 +29,8 @@ export function formatTurkishPhone(input: string): string {
   if (!local) return input;
   return `0${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
 }
+
+// Basit ama yeterli e-posta doğrulaması (xxx@yyy.zzz)
+export function isValidEmail(input: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((input ?? "").trim());
+}

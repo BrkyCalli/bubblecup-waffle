@@ -43,6 +43,7 @@ export function buildOrderMessage(
     lines.push(
       `👤 Ad: ${customer.name.trim()}`,
       `📞 Telefon: ${formatTurkishPhone(customer.phone)}`,
+      `📧 E-posta: ${customer.email.trim()}`,
       `📍 Adres: ${address}`,
       "",
     );

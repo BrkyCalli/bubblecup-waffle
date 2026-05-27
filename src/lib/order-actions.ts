@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/admin";
-import { normalizeTurkishPhone, formatTurkishPhone } from "@/lib/validation";
+import {
+  normalizeTurkishPhone,
+  formatTurkishPhone,
+  isValidEmail,
+} from "@/lib/validation";
 import type { PersonSelection, CustomerInfo } from "@/types";
 import type { OrderStatus } from "@/types/db";
 
@@ -31,6 +35,7 @@ export async function createOrder(
 
   // Müşteri bilgilerini sunucuda doğrula (client'a güvenme)
   const name = customer.name?.trim() ?? "";
+  const email = customer.email?.trim() ?? "";
   const address = customer.address?.trim() ?? "";
   if (!name) {
     return { ok: false, error: "Ad Soyad zorunlu." };
@@ -40,6 +45,9 @@ export async function createOrder(
       ok: false,
       error: "Geçerli bir telefon numarası girin (05XX XXX XX XX).",
     };
+  }
+  if (!isValidEmail(email)) {
+    return { ok: false, error: "Geçerli bir e-posta adresi girin." };
   }
   if (!address) {
     return { ok: false, error: "Teslimat adresi zorunlu." };
@@ -60,6 +68,7 @@ export async function createOrder(
     p_customer_phone: formatTurkishPhone(customer.phone),
     p_delivery_address: address,
     p_delivery_unit: customer.unit?.trim() ?? "",
+    p_customer_email: email,
   });
 
   if (error || !data) {

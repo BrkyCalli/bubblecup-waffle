@@ -6,7 +6,7 @@ import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { buildOrderUrl, formatPrice } from "@/lib/whatsapp";
 import { createOrder, type OrderItemInput } from "@/lib/order-actions";
-import { isValidTurkishPhone } from "@/lib/validation";
+import { isValidTurkishPhone, isValidEmail } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import type { PersonSelection, CustomerInfo } from "@/types";
 import { ProductImage } from "./ProductImage";
@@ -46,9 +46,11 @@ function SelectionSummary({
 export function CartClient({
   initialName,
   initialPhone,
+  initialEmail,
 }: {
   initialName: string;
   initialPhone: string;
+  initialEmail: string;
 }) {
   const { items, total, updateQuantity, removeItem, clearCart } = useCart();
   const [note, setNote] = useState("");
@@ -61,6 +63,7 @@ export function CartClient({
   // Müşteri / teslimat bilgileri (üye ise ad + telefon profilden ön-dolu)
   const [name, setName] = useState(initialName);
   const [phone, setPhone] = useState(initialPhone);
+  const [email, setEmail] = useState(initialEmail);
   const [address, setAddress] = useState("");
   const [unit, setUnit] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -83,6 +86,10 @@ export function CartClient({
       setFormError("Geçerli bir telefon numarası girin (05XX XXX XX XX).");
       return;
     }
+    if (!isValidEmail(email)) {
+      setFormError("Geçerli bir e-posta adresi girin.");
+      return;
+    }
     if (!address.trim()) {
       setFormError("Lütfen teslimat adresini girin.");
       return;
@@ -93,6 +100,7 @@ export function CartClient({
     const customer: CustomerInfo = {
       name: name.trim(),
       phone: phone.trim(),
+      email: email.trim(),
       address: address.trim(),
       unit: unit.trim(),
     };
@@ -347,6 +355,23 @@ export function CartClient({
                 autoComplete="tel"
                 placeholder="05XX XXX XX XX"
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="eposta" className="text-sm font-medium text-metin">
+                E-posta <span className="text-pembe-koyu">*</span>
+              </label>
+              <Input
+                id="eposta"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                placeholder="ornek@eposta.com"
+              />
+              <span className="text-xs text-metin-orta">
+                Siparişin sonrası deneyimini sormak için kullanılır.
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">

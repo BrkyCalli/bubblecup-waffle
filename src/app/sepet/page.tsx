@@ -24,13 +24,19 @@ export default async function CartPage() {
     initialName = profile?.full_name ?? "";
     initialPhone = profile?.phone ?? "";
   }
+  // Üyenin e-postası hesabından gelir (misafir boş başlar)
+  const initialEmail = user?.email ?? "";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
       <h1 className="mb-8 font-display text-4xl font-bold text-metin sm:text-5xl">
         Sepetim
       </h1>
-      <CartClient initialName={initialName} initialPhone={initialPhone} />
+      <CartClient
+        initialName={initialName}
+        initialPhone={initialPhone}
+        initialEmail={initialEmail}
+      />
     </div>
   );
 }

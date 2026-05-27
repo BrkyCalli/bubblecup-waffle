@@ -31,6 +31,7 @@ export interface CartItem {
 export interface CustomerInfo {
   name: string; // Ad Soyad (zorunlu)
   phone: string; // Telefon (zorunlu, TR formatı)
+  email: string; // E-posta (zorunlu — yorum maili için)
   address: string; // Teslimat adresi (zorunlu)
   unit: string; // Daire/Kapı No (opsiyonel)
 }

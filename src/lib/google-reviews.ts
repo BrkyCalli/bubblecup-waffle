@@ -15,6 +15,28 @@ const FIELD_MASK = [
 ].join(",");
 
 const MIN_RATING = 4; // yalnızca 4-5 yıldızlı yorumlar
+const MIN_COMMENT_LENGTH = 20; // çok kısa yorumları ele
+
+// Yorumda geçmesini İSTEMEDİĞİMİZ konum/adres ifadeleri.
+// - Belirgin/çok kelimeli olanlar alt dize (substring) ile eşleşir.
+// - Generic tek kelimeler TAM KELİME olarak eşleşir; böylece "il" → "filiz",
+//   "aydın" → "aydınlık" gibi yanlış yakalamalar olmaz.
+const LOCATION_PHRASES = ["orta mahalle", "doğugazi", "doğu gazi"];
+const LOCATION_WORDS = new Set([
+  "aydın",
+  "efeler",
+  "sokak",
+  "cadde",
+  "mahalle",
+  "semt",
+  "ilçe",
+  "şehir",
+  "il",
+  "adres",
+]);
+
+// Önceliklendirmede geriye atılan kişisel/personel ifadeleri (filtre değil).
+const STAFF_WORDS = ["personel", "garson", "çalışan"];
 
 // Sitede gösterilecek, normalize edilmiş yorum.
 export type GoogleReview = {
@@ -42,6 +64,26 @@ type PlaceDetailsResponse = { reviews?: RawGoogleReview[] };
 // Yorum dili Türkçe mi? (orijinal metni, yoksa çeviriyi baz al)
 function isTurkish(r: RawGoogleReview): boolean {
   return (r.originalText?.languageCode ?? r.text?.languageCode) === "tr";
+}
+
+// Orijinal (çevrilmemiş) yorum metni.
+function commentText(r: RawGoogleReview): string {
+  return (r.originalText?.text ?? r.text?.text ?? "").trim();
+}
+
+// Yorumda konum/adres kelimesi geçiyor mu?
+function hasLocationWord(comment: string): boolean {
+  const lower = comment.toLocaleLowerCase("tr");
+  if (LOCATION_PHRASES.some((p) => lower.includes(p))) return true;
+  // Türkçe harf/rakam dışındaki her şeyde böl → tam kelime kontrolü
+  const tokens = lower.split(/[^a-zçğıöşü0-9]+/).filter(Boolean);
+  return tokens.some((t) => LOCATION_WORDS.has(t));
+}
+
+// Yorumda personel/kişisel ifade geçiyor mu? (önceliklendirme için)
+function mentionsStaff(comment: string): boolean {
+  const lower = comment.toLocaleLowerCase("tr");
+  return STAFF_WORDS.some((w) => lower.includes(w));
 }
 
 export async function fetchGoogleReviews(): Promise<GoogleReview[]> {
@@ -72,27 +114,40 @@ export async function fetchGoogleReviews(): Promise<GoogleReview[]> {
   }
 
   const data = (await res.json()) as PlaceDetailsResponse;
-  const filtered = (data.reviews ?? []).filter(
-    (r) => (r.rating ?? 0) >= MIN_RATING && r.name,
+  const all = (data.reviews ?? []).filter((r) => r.name); // dedup id şart
+
+  // Ortak ön koşul: Türkçe + 4-5 yıldız (hem sıkı filtrede hem fallback'te geçerli)
+  const turkishGood = all.filter(
+    (r) => isTurkish(r) && (r.rating ?? 0) >= MIN_RATING,
   );
 
-  // Türkçe yorumları öne al, ardından yeni tarihliyi öne sırala.
-  filtered.sort((a, b) => {
-    const aTr = isTurkish(a);
-    const bTr = isTurkish(b);
-    if (aTr !== bTr) return aTr ? -1 : 1;
+  // Sıkı filtre: ayrıca en az 20 karakter + konum/adres kelimesi içermesin.
+  const strict = turkishGood.filter((r) => {
+    const c = commentText(r);
+    return c.length >= MIN_COMMENT_LENGTH && !hasLocationWord(c);
+  });
+
+  // Sıkı filtre hiç sonuç vermezse: konum + uzunluk koşullarını bırak,
+  // yalnızca metinli Türkçe 4-5 yıldızlı yorumları al.
+  const chosen =
+    strict.length > 0
+      ? strict
+      : turkishGood.filter((r) => commentText(r).length > 0);
+
+  // Sıralama: personel/kişisel ifade GEÇMEYENLER önce, sonra yeni tarihli önce.
+  chosen.sort((a, b) => {
+    const aStaff = mentionsStaff(commentText(a));
+    const bStaff = mentionsStaff(commentText(b));
+    if (aStaff !== bStaff) return aStaff ? 1 : -1;
     return (b.publishTime ?? "").localeCompare(a.publishTime ?? "");
   });
 
-  return filtered.map((r): GoogleReview => {
-    const original = r.originalText ?? r.text; // çeviri değil, orijinal metin
-    return {
-      googleReviewId: r.name as string,
-      author: r.authorAttribution?.displayName?.trim() || "Google Kullanıcısı",
-      rating: r.rating ?? 5,
-      comment: (original?.text ?? "").trim(),
-      photo: r.authorAttribution?.photoUri ?? null,
-      publishedAt: r.publishTime ?? new Date().toISOString(),
-    };
-  });
+  return chosen.map((r): GoogleReview => ({
+    googleReviewId: r.name as string,
+    author: r.authorAttribution?.displayName?.trim() || "Google Kullanıcısı",
+    rating: r.rating ?? 5,
+    comment: commentText(r),
+    photo: r.authorAttribution?.photoUri ?? null,
+    publishedAt: r.publishTime ?? new Date().toISOString(),
+  }));
 }

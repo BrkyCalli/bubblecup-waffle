@@ -73,6 +73,7 @@ create table if not exists public.orders (
   whatsapp_sent    boolean not null default false,
   customer_name    text,    -- sipariş anında girilen ad soyad
   customer_phone   text,    -- sipariş anında girilen telefon
+  customer_email   text,    -- sipariş anında girilen e-posta (yorum maili için)
   delivery_address text,    -- teslimat adresi
   delivery_unit    text,    -- daire/kapı no (opsiyonel)
   created_at       timestamptz not null default now()
@@ -83,6 +84,7 @@ create index if not exists orders_created_at_idx on public.orders(created_at des
 -- Mevcut kurulumlar için (orders tablosu çoktan oluştuysa) eksik sütunları ekle:
 alter table public.orders add column if not exists customer_name    text;
 alter table public.orders add column if not exists customer_phone   text;
+alter table public.orders add column if not exists customer_email   text;
 alter table public.orders add column if not exists delivery_address text;
 alter table public.orders add column if not exists delivery_unit    text;
 
@@ -188,15 +190,17 @@ grant select, update on public.profiles to authenticated;
 -- kalemlerini ekleyebilmek için gerekli). Fiyatları client'tan DEĞİL,
 -- products tablosundan okur. Hepsi tek işlemde (atomik) yazılır.
 -- p_items biçimi: [{ "product_id": "...", "quantity": 2, "customizations": [...] }, ...]
--- NOT: imza değiştiği için eski 2 parametreli sürümü düşürüyoruz.
+-- NOT: imza değiştiği için eski sürümleri düşürüyoruz.
 drop function if exists public.create_order(jsonb, text);
+drop function if exists public.create_order(jsonb, text, text, text, text, text);
 create or replace function public.create_order(
   p_items            jsonb,
   p_note             text default null,
   p_customer_name    text default null,
   p_customer_phone   text default null,
   p_delivery_address text default null,
-  p_delivery_unit    text default null
+  p_delivery_unit    text default null,
+  p_customer_email   text default null
 )
 returns uuid
 language plpgsql
@@ -229,7 +233,7 @@ begin
   -- Sipariş başlığı (total'i kalemlerden sonra güncelliyoruz)
   insert into public.orders (
     user_id, status, total, notes, whatsapp_sent,
-    customer_name, customer_phone, delivery_address, delivery_unit
+    customer_name, customer_phone, customer_email, delivery_address, delivery_unit
   )
   values (
     auth.uid(),                                  -- üye ise id, misafir ise null
@@ -239,6 +243,7 @@ begin
     true,
     trim(p_customer_name),
     trim(p_customer_phone),
+    nullif(trim(coalesce(p_customer_email, '')), ''),
     trim(p_delivery_address),
     nullif(trim(coalesce(p_delivery_unit, '')), '')
   )
@@ -280,4 +285,123 @@ begin
 end;
 $$;
 
-grant execute on function public.create_order(jsonb, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.create_order(jsonb, text, text, text, text, text, text) to anon, authenticated;
+
+-- ----------------------------------------------------------------
+-- 9) REVIEWS  (sipariş sonrası yorum/puan sistemi)
+-- ----------------------------------------------------------------
+-- Akış: cron 2 saati geçmiş siparişlere 'pending' review + token oluşturur →
+-- müşteri /yorum/[token]'da doldurur (status 'submitted') → admin onaylar
+-- ('approved') → ana sayfada görünür.
+create table if not exists public.reviews (
+  id            uuid primary key default gen_random_uuid(),
+  order_id      uuid not null unique references public.orders(id) on delete cascade,
+  token         text not null unique,
+  customer_name text,
+  email_to      text,          -- yorum maili bu adrese gönderildi
+  rating        int check (rating between 1 and 5),
+  comment       text,
+  status        text not null default 'pending'
+                check (status in ('pending','submitted','approved','rejected')),
+  created_at    timestamptz not null default now(),
+  submitted_at  timestamptz
+);
+create index if not exists reviews_status_idx on public.reviews(status);
+create index if not exists reviews_token_idx on public.reviews(token);
+
+alter table public.reviews enable row level security;
+
+-- Herkes yalnızca ONAYLI yorumları görür (ana sayfa için)
+drop policy if exists reviews_public_select on public.reviews;
+create policy reviews_public_select on public.reviews
+  for select using (status = 'approved');
+
+-- Admin hepsini görür ve günceller (onay/red)
+drop policy if exists reviews_admin_all on public.reviews;
+create policy reviews_admin_all on public.reviews
+  for all using (public.is_admin()) with check (public.is_admin());
+
+grant select on public.reviews to anon, authenticated;
+grant update on public.reviews to authenticated;   -- admin onayı (RLS admin'e kısıtlar)
+
+-- (a) Cron: 2 saati geçmiş, iptal olmayan, e-postası olan ve henüz review'i
+-- olmayan siparişlere 'pending' review + token oluşturur; gönderilecek
+-- (token, email, ad) listesini döndürür. Idempotent (tekrar çalışınca çoğaltmaz).
+create or replace function public.enqueue_review_emails()
+returns table(token text, email_to text, customer_name text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  with eligible as (
+    insert into public.reviews (order_id, token, customer_name, email_to, status)
+    select
+      o.id,
+      gen_random_uuid()::text,
+      o.customer_name,
+      o.customer_email,
+      'pending'
+    from public.orders o
+    where o.created_at < now() - interval '2 hours'
+      and o.status <> 'cancelled'
+      and o.customer_email is not null
+      and o.customer_email <> ''
+      and not exists (select 1 from public.reviews r where r.order_id = o.id)
+    returning reviews.token, reviews.email_to, reviews.customer_name
+  )
+  select e.token, e.email_to, e.customer_name from eligible e;
+end;
+$$;
+
+-- (b) Token ile review'i getirir (/yorum/[token] sayfası için)
+create or replace function public.get_review_by_token(p_token text)
+returns table(status text, rating int, comment text, customer_name text)
+language sql
+security definer
+set search_path = public
+as $$
+  select r.status, r.rating, r.comment, r.customer_name
+  from public.reviews r
+  where r.token = p_token;
+$$;
+
+-- (c) Müşteri yorumu gönderir (yalnızca 'pending' durumdayken, puan 1-5)
+create or replace function public.submit_review(
+  p_token   text,
+  p_rating  int,
+  p_comment text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status text;
+begin
+  if p_rating is null or p_rating < 1 or p_rating > 5 then
+    raise exception 'Puan 1-5 arasında olmalı';
+  end if;
+
+  select status into v_status from public.reviews where token = p_token;
+  if v_status is null then
+    raise exception 'Geçersiz bağlantı';
+  end if;
+  if v_status <> 'pending' then
+    raise exception 'Bu sipariş için zaten yorum yapılmış';
+  end if;
+
+  update public.reviews
+  set rating = p_rating,
+      comment = nullif(trim(coalesce(p_comment, '')), ''),
+      status = 'submitted',
+      submitted_at = now()
+  where token = p_token;
+end;
+$$;
+
+grant execute on function public.enqueue_review_emails() to anon, authenticated;
+grant execute on function public.get_review_by_token(text) to anon, authenticated;
+grant execute on function public.submit_review(text, int, text) to anon, authenticated;

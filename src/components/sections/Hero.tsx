@@ -12,6 +12,7 @@ export function Hero() {
         alt="BUBBLECUP WAFFLE"
         className="absolute inset-0"
         sizes="100vw"
+        priority
       >
         <div className="absolute inset-0 bg-gradient-to-br from-pembe-koyu via-pembe to-altin" />
       </ImageWithFallback>

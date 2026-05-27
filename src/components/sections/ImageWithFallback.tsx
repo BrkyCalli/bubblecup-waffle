@@ -9,6 +9,8 @@ interface Props {
   alt: string;
   className?: string;
   sizes?: string;
+  // Ekranın üstündeki (LCP) görseller için true — öncelikli yüklenir.
+  priority?: boolean;
   // Fotoğraf yokken/yüklenemezken gösterilecek yer tutucu (gradyan vb.)
   children: ReactNode;
 }
@@ -20,6 +22,7 @@ export function ImageWithFallback({
   alt,
   className,
   sizes,
+  priority = false,
   children,
 }: Props) {
   const [error, setError] = useState(false);
@@ -33,6 +36,7 @@ export function ImageWithFallback({
           alt={alt}
           fill
           sizes={sizes}
+          priority={priority}
           className="object-cover"
           onError={() => setError(true)}
         />

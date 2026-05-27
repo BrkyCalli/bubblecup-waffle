@@ -12,6 +12,7 @@ export type AdminReview = {
   customer_name: string | null;
   status: "submitted" | "approved" | "rejected";
   submitted_at: string | null;
+  source: "site" | "google";
 };
 
 const STATUS_LABEL: Record<AdminReview["status"], string> = {
@@ -93,6 +94,15 @@ export function AdminReviews({ reviews }: { reviews: AdminReview[] }) {
                 </div>
                 <span className="text-sm text-metin-orta">
                   {formatDate(r.submitted_at)}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    r.source === "google"
+                      ? "bg-altin/15 text-altin-koyu"
+                      : "bg-pembe/15 text-pembe-koyu"
+                  }`}
+                >
+                  {r.source === "google" ? "🗺️ Google" : "✍️ Site"}
                 </span>
               </div>
               <span

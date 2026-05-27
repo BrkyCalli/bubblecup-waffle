@@ -21,7 +21,7 @@ export default async function AdminYorumlarPage() {
   // Müşterinin gönderdiği yorumlar (pending = henüz yanıtlamadı, gösterme)
   const { data } = await supabase
     .from("reviews")
-    .select("id, rating, comment, customer_name, status, submitted_at")
+    .select("id, rating, comment, customer_name, status, submitted_at, source")
     .in("status", ["submitted", "approved", "rejected"])
     .order("submitted_at", { ascending: false, nullsFirst: false });
 

@@ -405,3 +405,69 @@ $$;
 grant execute on function public.enqueue_review_emails() to anon, authenticated;
 grant execute on function public.get_review_by_token(text) to anon, authenticated;
 grant execute on function public.submit_review(text, int, text) to anon, authenticated;
+
+-- ----------------------------------------------------------------
+-- 10) GOOGLE YORUMLARI  (Google Maps yorumlarını siteye senkronla)
+-- ----------------------------------------------------------------
+-- Akış: cron Places API (New)'den 4-5 yıldızlı yorumları çeker →
+-- upsert_google_review ile 'approved'+'google' olarak kaydeder →
+-- ana sayfada site yorumlarıyla birlikte görünür. google_review_id
+-- (Google'ın kararlı review 'name'i) ile duplicate engellenir.
+
+-- reviews tablosuna kaynak + google alanları
+alter table public.reviews add column if not exists source text not null default 'site'
+  check (source in ('site', 'google'));
+alter table public.reviews add column if not exists google_review_id text;
+alter table public.reviews add column if not exists author_photo text;  -- google profil fotosu URL'i
+
+-- Google yorumlarının order_id / token'ı yoktur → nullable yap.
+-- (Mevcut unique kısıtları kalır; PostgreSQL'de birden çok NULL serbesttir.)
+alter table public.reviews alter column order_id drop not null;
+alter table public.reviews alter column token    drop not null;
+
+-- Aynı Google yorumu iki kez eklenmesin (kısmi unique index)
+create unique index if not exists reviews_google_id_idx
+  on public.reviews(google_review_id) where google_review_id is not null;
+
+-- Google yorumunu ekler/günceller. Cron anon anahtarıyla çağırır; security
+-- definer RLS'i bypass eder. Çakışmada İÇERİK güncellenir ama STATUS'A
+-- DOKUNULMAZ — böylece admin bir Google yorumunu reddederse cron geri getirmez.
+create or replace function public.upsert_google_review(
+  p_google_review_id text,
+  p_author           text,
+  p_rating           int,
+  p_comment          text,
+  p_photo            text,
+  p_published_at     timestamptz
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.reviews (
+    source, google_review_id, customer_name, rating, comment,
+    author_photo, status, submitted_at
+  )
+  values (
+    'google',
+    p_google_review_id,
+    p_author,
+    p_rating,
+    nullif(trim(coalesce(p_comment, '')), ''),
+    p_photo,
+    'approved',
+    coalesce(p_published_at, now())
+  )
+  on conflict (google_review_id) where google_review_id is not null
+  do update set
+    rating        = excluded.rating,
+    comment       = excluded.comment,
+    customer_name = excluded.customer_name,
+    author_photo  = excluded.author_photo;
+end;
+$$;
+
+grant execute on function public.upsert_google_review(text, text, int, text, text, timestamptz)
+  to anon, authenticated;

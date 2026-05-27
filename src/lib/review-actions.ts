@@ -1,6 +1,8 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 
 export type SubmitReviewResult = { ok: boolean; error?: string };
 
@@ -35,5 +37,36 @@ export async function submitReview(
     return { ok: false, error: friendly(error.message) };
   }
 
+  return { ok: true };
+}
+
+export type ModerateResult = { ok: boolean; error?: string };
+
+// Yorumu onaylar/reddeder. Yalnızca admin (RLS de admin'e kısıtlar).
+export async function moderateReview(
+  id: string,
+  status: "approved" | "rejected",
+): Promise<ModerateResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!isAdmin(user)) {
+    return { ok: false, error: "Bu işlem için yetkiniz yok." };
+  }
+
+  const { error } = await supabase
+    .from("reviews")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) {
+    console.error("moderateReview hatası:", error);
+    return { ok: false, error: "Yorum güncellenemedi." };
+  }
+
+  revalidatePath("/admin/yorumlar");
+  revalidatePath("/"); // ana sayfa onaylı yorumları yeniden çeksin
   return { ok: true };
 }

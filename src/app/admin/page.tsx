@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient, getUser } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/admin";
+import { AdminNav } from "@/components/sections/AdminNav";
 import { AdminOrders, type AdminOrder } from "@/components/sections/AdminOrders";
 
 export const metadata: Metadata = {
@@ -45,9 +46,11 @@ export default async function AdminPage() {
         )}
       </p>
 
-      <div className="mt-8">
-        <AdminOrders orders={orders} />
+      <div className="mt-6">
+        <AdminNav active="siparisler" />
       </div>
+
+      <AdminOrders orders={orders} />
     </div>
   );
 }
